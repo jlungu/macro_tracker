@@ -1,0 +1,17 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    anthropic_api_key: str
+    supabase_url: str
+    supabase_service_key: str
+    supabase_storage_bucket: str = "meal-images"
+
+    # CORS — tighten in production
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
+    cors_origin_regex: str = r"http://192\.168\.\d+\.\d+:\d+"
+
+
+settings = Settings()  # type: ignore[call-arg]

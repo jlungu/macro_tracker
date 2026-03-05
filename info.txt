@@ -1,0 +1,30 @@
+Project scaffolded
+Structure:
+
+
+macro_tracker/
+├── frontend/          React + Vite + TS + Tailwind + shadcn/ui + PWA
+├── backend/           FastAPI + Anthropic SDK + Supabase
+└── supabase/
+    └── migrations/    001_initial.sql
+Frontend highlights:
+
+App.tsx — Router with 3 pages + bottom nav
+LogPage.tsx — Text + photo meal logging via Claude
+DashboardPage.tsx — Today's meals + macro progress bars
+HistoryPage.tsx — Paginated meal history
+MealLogger.tsx — Chat-style input with camera capture
+api.ts — Typed API client
+PWA configured via vite.config.ts (installable, offline-capable)
+
+Backend highlights:
+
+main.py — FastAPI app with CORS
+routes/meals.py — POST /meals/log, GET /meals/summary/{date}, GET /meals, DELETE /meals/{id}
+services/claude.py — Claude claude-opus-4-6 analyzes meals, returns structured JSON macros
+services/storage.py — Supabase Storage for meal images
+To get running:
+
+Supabase: Run supabase/migrations/001_initial.sql in your SQL editor, create a public meal-images bucket in Storage
+Backend: cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && cp .env.example .env (fill keys) → uvicorn app.main:app --reload
+Frontend: cd frontend && npm install && cp .env.example .env.local → npm run dev
