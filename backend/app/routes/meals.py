@@ -23,9 +23,12 @@ async def log_meal(
 ) -> LogMealResponse:
     """Analyze a meal with Claude and persist it to the database."""
     db = get_db()
-    today = date.today()
-    start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc).isoformat()
-    end = datetime(today.year, today.month, today.day, 23, 59, 59, tzinfo=timezone.utc).isoformat()
+    # Use the client's local date (via tz_offset) so daily totals match their timezone
+    offset = timedelta(minutes=body.tz_offset)
+    now_local = datetime.now(timezone.utc) - offset  # shift UTC to local time
+    local_midnight = datetime(now_local.year, now_local.month, now_local.day)
+    start = (local_midnight + offset).replace(tzinfo=timezone.utc).isoformat()
+    end = (local_midnight + offset + timedelta(hours=24) - timedelta(seconds=1)).replace(tzinfo=timezone.utc).isoformat()
     rows = (
         db.table("meals")
         .select("macros")

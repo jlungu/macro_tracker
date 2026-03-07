@@ -76,7 +76,10 @@ export interface DailySummary {
 
 // Log a meal via text and/or image
 export async function logMeal(payload: LogMealPayload): Promise<LogMealResponse> {
-  const { data } = await api.post<LogMealResponse>("/meals/log", payload);
+  const { data } = await api.post<LogMealResponse>("/meals/log", {
+    ...payload,
+    tz_offset: new Date().getTimezoneOffset(),
+  });
   return data;
 }
 

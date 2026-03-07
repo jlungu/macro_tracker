@@ -45,6 +45,7 @@ class LogMealRequest(BaseModel):
     image_base64: str | None = None
     image_mime_type: str | None = None
     history: list[HistoryMessage] = []
+    tz_offset: int = 0  # JS getTimezoneOffset(): positive = behind UTC (e.g. UTC-5 → 300)
 
 
 class LogMealResponse(BaseModel):
