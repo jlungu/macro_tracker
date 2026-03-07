@@ -55,6 +55,11 @@ class LogMealResponse(BaseModel):
     new_targets: Targets | None = None
 
 
+class PatchMealRequest(BaseModel):
+    description: str | None = None
+    macros: Macros | None = None
+
+
 class DailySummary(BaseModel):
     date: str
     meals: list[Meal]

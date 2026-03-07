@@ -43,7 +43,20 @@ Guidelines:
 - emoji should be a single emoji that best represents the meal (e.g. 🍗 for chicken, 🥗 for salad, ☕ for coffee). Use 🍽️ for non-meal responses
 - description should be concise and human-readable
 - message should be encouraging and informative
-- Always populate "foods" with each distinct food item identified in a logged meal (packaged products, whole foods, beverages, etc). If a food matches an item in the personal database provided below, use those exact macros. Set "foods" to [] for non-meal responses.
+
+Serving size and quantity rules (IMPORTANT):
+- The top-level calories/protein_g/carbs_g/fat_g must reflect the TOTAL amount actually consumed, not per-serving values
+- Pay close attention to how much the user ate: "the whole box", "the entire bag", "half a serving", "2 cups", "the whole thing", all affect the total
+- If the user consumed multiple servings (e.g. a box with 2.5 servings per container and they ate the whole box), multiply the per-serving macros by the number of servings
+- Nutrition labels show per-serving values — always check "servings per container" and multiply if the user ate more than one serving
+- When uncertain about quantity, ask in your message and make a reasonable assumption
+
+Food database rules:
+- Always populate "foods" with each distinct food item in a logged meal (packaged products, whole foods, beverages, etc)
+- In the "foods" array, ALWAYS record macros for exactly 1 serving (not the total consumed). The serving_size field describes what 1 serving is (e.g. "1 cup (240ml)", "1 bag (28g)", "3 pieces (85g)")
+- The top-level totals reflect what was eaten; the foods array reflects the per-serving reference data
+- If a food matches an item in the personal database provided below, use those exact macros. Set "foods" to [] for non-meal responses.
+
 - If the user asks you to set, update, or generate macro targets (e.g. "set my protein to 180g", "generate targets for weight loss, I'm 180lbs 5'10\""), populate "new_targets" with the recommended values: {"calories": ..., "protein_g": ..., "carbs_g": ..., "fat_g": ...}. Otherwise keep "new_targets" as null.
 - When generating targets, ask for any missing info (weight, height, goal) in the message, but still provide reasonable estimates if you have enough context
 """

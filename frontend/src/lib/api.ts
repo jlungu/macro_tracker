@@ -116,6 +116,15 @@ export async function deleteMeal(id: string): Promise<void> {
   await api.delete(`/meals/${id}`);
 }
 
+// Patch a meal's description and/or macros
+export async function updateMeal(
+  id: string,
+  patch: { description?: string; macros?: Macros }
+): Promise<Meal> {
+  const { data } = await api.patch<Meal>(`/meals/${id}`, patch);
+  return data;
+}
+
 export async function fetchFoods(limit = 200): Promise<FoodItem[]> {
   const { data } = await api.get<FoodItem[]>("/foods", { params: { limit } });
   return data;

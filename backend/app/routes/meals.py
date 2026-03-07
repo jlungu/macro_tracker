@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from app.database import get_db
@@ -8,6 +9,7 @@ from app.models.meal import (
     LogMealResponse,
     Macros,
     Meal,
+    PatchMealRequest,
     Targets,
 )
 from app.services.claude import analyze_meal
@@ -61,7 +63,9 @@ async def log_meal(
     targets = Targets(**targets_row.data) if targets_row and targets_row.data else Targets()
 
     # Search the user's food database for items matching keywords in the message
-    words = [w for w in body.message.lower().split() if len(w) > 2]
+    # Strip punctuation so "eggs," doesn't break PostgREST ilike syntax
+    words = [re.sub(r"[^a-z0-9]", "", w) for w in body.message.lower().split()]
+    words = [w for w in words if len(w) > 2]
     matched_foods: list[dict] = []
     if words:
         filter_str = ",".join(f"name.ilike.%{w}%" for w in words[:5])
@@ -217,6 +221,33 @@ async def list_meals(
         .execute()
     )
     return [Meal(**r) for r in rows.data]
+
+
+@router.patch("/{meal_id}", response_model=Meal)
+async def patch_meal(
+    meal_id: str,
+    body: PatchMealRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> Meal:
+    """Update a meal's description and/or macros."""
+    db = get_db()
+    updates: dict = {}
+    if body.description is not None:
+        updates["description"] = body.description
+    if body.macros is not None:
+        updates["macros"] = body.macros.model_dump()
+    if not updates:
+        raise HTTPException(status_code=422, detail="Nothing to update")
+    row = (
+        db.table("meals")
+        .update(updates)
+        .eq("id", meal_id)
+        .eq("user_id", current_user.id)
+        .execute()
+    )
+    if not row.data:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return Meal(**row.data[0])
 
 
 @router.delete("/{meal_id}", status_code=204)

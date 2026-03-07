@@ -4,7 +4,9 @@ import {
   fetchDailySummary,
   fetchMealHistory,
   logMeal,
+  updateMeal,
   type LogMealPayload,
+  type Macros,
 } from "@/lib/api";
 
 export function useDailySummary(date: string) {
@@ -33,6 +35,18 @@ export function useLogMeal() {
       if (data.new_targets) {
         queryClient.invalidateQueries({ queryKey: ["targets"] });
       }
+    },
+  });
+}
+
+export function useUpdateMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: { description?: string; macros?: Macros } }) =>
+      updateMeal(id, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
+      queryClient.invalidateQueries({ queryKey: ["meals"] });
     },
   });
 }
