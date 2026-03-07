@@ -40,8 +40,8 @@ for (path, size) in sizes {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = ctx
 
-    // White background
-    NSColor.white.setFill()
+    // Cream/ivory background
+    NSColor(red: 0.98, green: 0.96, blue: 0.91, alpha: 1.0).setFill()
     NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: size, height: size),
                  xRadius: size * 0.22, yRadius: size * 0.22).fill()
 
