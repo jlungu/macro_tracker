@@ -5,6 +5,7 @@ Claude is given the user's message (and optional image) and returns
 structured macro information plus a friendly response.
 """
 
+import asyncio
 import json
 import base64
 import anthropic
@@ -107,12 +108,23 @@ async def analyze_meal(
     user_content.append({"type": "text", "text": user_message or "What macros are in this meal?"})
     messages.append({"role": "user", "content": user_content})
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        system=system,
-        messages=messages,  # type: ignore[arg-type]
-    )
+    # Retry up to 3 times on transient overload errors (529)
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                system=system,
+                messages=messages,  # type: ignore[arg-type]
+            )
+            break
+        except anthropic.InternalServerError as e:
+            last_error = e
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s
+    else:
+        raise last_error  # type: ignore[misc]
 
     raw = response.content[0].text  # type: ignore[union-attr]
 

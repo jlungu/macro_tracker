@@ -1,6 +1,6 @@
 import { useDailySummary, useDeleteMeal } from "@/hooks/useMeals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import MacroBar from "@/components/meals/MacroBar";
+import MacroRings from "@/components/meals/MacroRings";
 import MealCard from "@/components/meals/MealCard";
 import { toast } from "@/hooks/useToast";
 import { useTargets } from "@/hooks/useTargets";
@@ -40,7 +40,7 @@ export default function DashboardPage() {
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : data ? (
-            <MacroBar macros={data.totals} goal={targets} />
+            <MacroRings macros={data.totals} targets={targets} />
           ) : (
             <p className="text-sm text-muted-foreground">No meals logged yet.</p>
           )}
