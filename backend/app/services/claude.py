@@ -14,9 +14,9 @@ from app.models.meal import Macros, Targets
 
 client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-SYSTEM_PROMPT = """You are a nutrition assistant integrated into a macro tracking app.
+SYSTEM_PROMPT = """You are a knowledgeable, encouraging nutrition coach integrated into a macro tracking app. You help users log meals, understand their nutrition, and make progress toward their goals. Be warm, direct, and coach-like — celebrate wins, flag concerns gently, and give actionable advice.
 
-When the user describes a meal or sends a photo of food, extract macro information and respond helpfully.
+When the user describes a meal or sends a photo of food, extract macro information and respond helpfully. For questions about progress, goals, or nutrition, answer like a coach who actually knows their data.
 
 Always respond with a JSON object in this exact format:
 {
@@ -27,7 +27,7 @@ Always respond with a JSON object in this exact format:
   "protein_g": 42,
   "carbs_g": 65,
   "fat_g": 12,
-  "message": "A friendly 1-2 sentence response to the user",
+  "message": "A coach-like 1-3 sentence response to the user",
   "new_targets": null,
   "foods": [
     {"name": "Chicken thigh", "serving_size": "1 thigh (100g)", "calories": 210, "protein_g": 26, "carbs_g": 0, "fat_g": 11},
@@ -37,16 +37,16 @@ Always respond with a JSON object in this exact format:
 
 Guidelines:
 - Set "is_meal" to true only if the user is clearly logging food or a drink with nutritional value
-- Set "is_meal" to false for greetings, questions, or anything with no food being logged — in that case set calories/protein/carbs/fat to 0
+- Set "is_meal" to false for questions, check-ins, or anything where no food is being logged — in that case set calories/protein/carbs/fat to 0
 - Estimate macros as accurately as possible based on typical serving sizes
 - If an image is provided, use it to inform your estimates
-- emoji should be a single emoji that best represents the meal (e.g. 🍗 for chicken, 🥗 for salad, ☕ for coffee). Use 🍽️ for non-meal responses
+- emoji should be a single emoji that best represents the meal. Use 🍽️ for non-meal responses
 - description should be concise and human-readable
-- message should be encouraging and informative
+- message should sound like a real coach: encouraging, specific, and honest. Reference their actual numbers when relevant (e.g. "You're 40g short on protein today" or "Great week — you hit your calorie target 5 out of 7 days"). Avoid generic filler.
 
 Serving size and quantity rules (IMPORTANT):
 - The top-level calories/protein_g/carbs_g/fat_g must reflect the TOTAL amount actually consumed, not per-serving values
-- Pay close attention to how much the user ate: "the whole box", "the entire bag", "half a serving", "2 cups", "the whole thing", all affect the total
+- Pay close attention to how much the user ate: "the whole box", "the entire bag", "half a serving", "2 cups" all affect the total
 - If the user consumed multiple servings (e.g. a box with 2.5 servings per container and they ate the whole box), multiply the per-serving macros by the number of servings
 - Nutrition labels show per-serving values — always check "servings per container" and multiply if the user ate more than one serving
 - When uncertain about quantity, ask in your message and make a reasonable assumption
@@ -70,17 +70,17 @@ async def analyze_meal(
     daily_totals: dict | None = None,
     targets: Targets | None = None,
     matched_foods: list[dict] | None = None,
+    weekly_summary: dict | None = None,
 ) -> tuple[Macros, str, str, str, bool, Targets | None, list[dict]]:
-    """
-    Returns (macros, description, claude_message, is_meal).
-    """
     system = SYSTEM_PROMPT
+
     if matched_foods:
         system += (
-            f"\n\nYour personal food database contains these items that may match the user's message:\n"
+            f"\n\nPersonal food database — items that may match this message:\n"
             f"{json.dumps(matched_foods, indent=2)}\n"
             "If the user is eating any of these, use their exact macros and include them in \"foods\"."
         )
+
     if daily_totals:
         system += (
             f"\n\nToday's logged macros so far: "
@@ -89,14 +89,25 @@ async def analyze_meal(
             f"{daily_totals['carbs_g']:.0f}g carbs, "
             f"{daily_totals['fat_g']:.0f}g fat."
         )
+
     if targets:
         system += (
             f" Daily targets: {targets.calories:.0f} kcal, "
             f"{targets.protein_g:.0f}g protein, "
             f"{targets.carbs_g:.0f}g carbs, "
-            f"{targets.fat_g:.0f}g fat. "
-            "Use both to answer questions about remaining macros or progress."
+            f"{targets.fat_g:.0f}g fat."
         )
+
+    if weekly_summary:
+        lines = []
+        for day, totals in weekly_summary.items():
+            lines.append(
+                f"  {day}: {totals['calories']:.0f} kcal, "
+                f"{totals['protein_g']:.0f}g P, "
+                f"{totals['carbs_g']:.0f}g C, "
+                f"{totals['fat_g']:.0f}g F"
+            )
+        system += "\n\nLast 7 days (days with no entry had no meals logged):\n" + "\n".join(lines)
 
     messages: list = []
 

@@ -62,6 +62,27 @@ async def log_meal(
     )
     targets = Targets(**targets_row.data) if targets_row and targets_row.data else Targets()
 
+    # Fetch last 7 days of meals for weekly coaching context
+    week_start = (local_midnight - timedelta(days=6) + offset).replace(tzinfo=timezone.utc).isoformat()
+    week_rows = (
+        db.table("meals")
+        .select("macros,created_at")
+        .eq("user_id", current_user.id)
+        .gte("created_at", week_start)
+        .execute()
+    )
+    # Aggregate into per-day buckets (keyed by local date string)
+    week_by_day: dict[str, dict] = {}
+    for r in week_rows.data:
+        # Convert stored UTC timestamp back to local date
+        ts = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+        local_date = (ts - offset).strftime("%Y-%m-%d")
+        if local_date not in week_by_day:
+            week_by_day[local_date] = {"calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0}
+        for k in ("calories", "protein_g", "carbs_g", "fat_g"):
+            week_by_day[local_date][k] += r["macros"][k]
+    weekly_summary = dict(sorted(week_by_day.items()))  # sorted by date ascending
+
     # Search the user's food database for items matching keywords in the message
     # Strip punctuation so "eggs," doesn't break PostgREST ilike syntax
     words = [re.sub(r"[^a-z0-9]", "", w) for w in body.message.lower().split()]
@@ -88,6 +109,7 @@ async def log_meal(
         daily_totals=daily_totals,
         targets=targets,
         matched_foods=matched_foods or None,
+        weekly_summary=weekly_summary or None,
     )
 
     if new_targets:
