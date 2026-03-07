@@ -12,7 +12,7 @@ import anthropic
 from app.config import settings
 from app.models.meal import Macros, Targets
 
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 SYSTEM_PROMPT = """You are a nutrition assistant integrated into a macro tracking app.
 
@@ -108,11 +108,11 @@ async def analyze_meal(
     user_content.append({"type": "text", "text": user_message or "What macros are in this meal?"})
     messages.append({"role": "user", "content": user_content})
 
-    # Retry up to 3 times on transient overload errors (529)
+    # Retry up to 5 times on transient overload errors (529)
     last_error: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(5):
         try:
-            response = client.messages.create(
+            response = await client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 system=system,
@@ -121,8 +121,8 @@ async def analyze_meal(
             break
         except anthropic.InternalServerError as e:
             last_error = e
-            if attempt < 2:
-                await asyncio.sleep(2 ** attempt)  # 1s, 2s
+            if attempt < 4:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s
     else:
         raise last_error  # type: ignore[misc]
 

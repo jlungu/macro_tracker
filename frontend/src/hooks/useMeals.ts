@@ -29,6 +29,7 @@ export function useLogMeal() {
       const today = new Date().toLocaleDateString("en-CA");
       queryClient.invalidateQueries({ queryKey: ["summary", today] });
       queryClient.invalidateQueries({ queryKey: ["meals"] });
+      queryClient.invalidateQueries({ queryKey: ["foods"] });
       if (data.new_targets) {
         queryClient.invalidateQueries({ queryKey: ["targets"] });
       }

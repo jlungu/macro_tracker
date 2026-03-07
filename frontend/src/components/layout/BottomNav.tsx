@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, History, Settings } from "lucide-react";
+import { LayoutDashboard, PlusCircle, BookOpen, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/dashboard", label: "Today", icon: LayoutDashboard },
   { to: "/log", label: "Log", icon: PlusCircle },
-  { to: "/history", label: "History", icon: History },
+  { to: "/history", label: "Library", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

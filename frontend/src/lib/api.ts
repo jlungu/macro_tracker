@@ -60,6 +60,7 @@ export interface LogMealPayload {
   image_base64?: string;
   image_mime_type?: string;
   history?: HistoryMessage[];
+  log_date?: string; // YYYY-MM-DD, set when backdating a meal
 }
 
 export interface LogMealResponse {
@@ -72,6 +73,14 @@ export interface DailySummary {
   date: string;
   meals: Meal[];
   totals: Macros;
+}
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  serving_size: string;
+  macros: Macros;
+  use_count: number;
 }
 
 // Log a meal via text and/or image
@@ -105,6 +114,15 @@ export async function fetchMealHistory(
 // Delete a meal
 export async function deleteMeal(id: string): Promise<void> {
   await api.delete(`/meals/${id}`);
+}
+
+export async function fetchFoods(limit = 200): Promise<FoodItem[]> {
+  const { data } = await api.get<FoodItem[]>("/foods", { params: { limit } });
+  return data;
+}
+
+export async function deleteFood(id: string): Promise<void> {
+  await api.delete(`/foods/${id}`);
 }
 
 export async function fetchTargets(): Promise<Targets> {

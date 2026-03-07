@@ -46,6 +46,7 @@ class LogMealRequest(BaseModel):
     image_mime_type: str | None = None
     history: list[HistoryMessage] = []
     tz_offset: int = 0  # JS getTimezoneOffset(): positive = behind UTC (e.g. UTC-5 → 300)
+    log_date: str | None = None  # YYYY-MM-DD override for backdating meals
 
 
 class LogMealResponse(BaseModel):

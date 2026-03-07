@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import MealLogger from "@/components/meals/MealLogger";
 import { useLogMeal } from "@/hooks/useMeals";
 import { toast } from "@/hooks/useToast";
@@ -17,6 +18,9 @@ interface BotMsg {
 type ChatMsg = UserMsg | BotMsg;
 
 export default function LogPage() {
+  const [searchParams] = useSearchParams();
+  const logDate = searchParams.get("date") ?? undefined;
+
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { mutate, isPending } = useLogMeal();
@@ -24,6 +28,14 @@ export default function LogPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isPending]);
+
+  const displayDate = logDate
+    ? new Date(logDate + "T00:00:00").toLocaleDateString([], {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
 
   function handleSubmit(payload: LogMealPayload, imagePreview?: string) {
     const history: HistoryMessage[] = messages.map((m) => ({
@@ -36,7 +48,7 @@ export default function LogPage() {
       { role: "user", content: payload.message, image: imagePreview },
     ]);
 
-    mutate({ ...payload, history }, {
+    mutate({ ...payload, history, log_date: logDate }, {
       onSuccess: (data) => {
         setMessages((prev) => [
           ...prev,
@@ -61,6 +73,13 @@ export default function LogPage() {
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100dvh - 80px)" }}>
+      {displayDate && (
+        <div className="px-4 py-2 bg-muted/50 border-b border-border/40 text-center">
+          <p className="text-xs text-muted-foreground">
+            Logging for <span className="font-medium text-foreground">{displayDate}</span>
+          </p>
+        </div>
+      )}
       {/* Scrollable messages — min-h-full + justify-end anchors messages to bottom */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="min-h-full flex flex-col justify-end gap-3 px-4 py-4">

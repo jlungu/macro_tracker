@@ -25,8 +25,15 @@ async def log_meal(
     db = get_db()
     # Use the client's local date (via tz_offset) so daily totals match their timezone
     offset = timedelta(minutes=body.tz_offset)
-    now_local = datetime.now(timezone.utc) - offset  # shift UTC to local time
-    local_midnight = datetime(now_local.year, now_local.month, now_local.day)
+    if body.log_date:
+        try:
+            d = date.fromisoformat(body.log_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid log_date format, use YYYY-MM-DD")
+        local_midnight = datetime(d.year, d.month, d.day)
+    else:
+        now_local = datetime.now(timezone.utc) - offset  # shift UTC to local time
+        local_midnight = datetime(now_local.year, now_local.month, now_local.day)
     start = (local_midnight + offset).replace(tzinfo=timezone.utc).isoformat()
     end = (local_midnight + offset + timedelta(hours=24) - timedelta(seconds=1)).replace(tzinfo=timezone.utc).isoformat()
     rows = (
@@ -92,21 +99,21 @@ async def log_meal(
             mime_type=body.image_mime_type or "image/jpeg",
         )
 
-    row = (
-        db.table("meals")
-        .insert(
-            {
-                "user_id": current_user.id,
-                "description": description,
-                "emoji": emoji,
-                "macros": macros.model_dump(),
-                "image_url": image_url,
-                "raw_input": body.message,
-                "notes": claude_message,
-            }
-        )
-        .execute()
-    )
+    meal_row: dict = {
+        "user_id": current_user.id,
+        "description": description,
+        "emoji": emoji,
+        "macros": macros.model_dump(),
+        "image_url": image_url,
+        "raw_input": body.message,
+        "notes": claude_message,
+    }
+    if body.log_date:
+        # Store backdated meals at noon local time so they sort naturally
+        noon_utc = (local_midnight + timedelta(hours=12) + offset).replace(tzinfo=timezone.utc)
+        meal_row["created_at"] = noon_utc.isoformat()
+
+    row = db.table("meals").insert(meal_row).execute()
 
     if not row.data:
         raise HTTPException(status_code=500, detail="Failed to save meal")
