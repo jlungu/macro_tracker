@@ -26,7 +26,7 @@ export function useLogMeal() {
   return useMutation({
     mutationFn: (payload: LogMealPayload) => logMeal(payload),
     onSuccess: (data) => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA");
       queryClient.invalidateQueries({ queryKey: ["summary", today] });
       queryClient.invalidateQueries({ queryKey: ["meals"] });
       if (data.new_targets) {

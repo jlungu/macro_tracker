@@ -13,5 +13,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
     cors_origin_regex: str = r"http://192\.168\.\d+\.\d+:\d+"
 
+    # Comma-separated list of permitted emails; empty = allow all verified users
+    allowed_emails: str = ""
+
 
 settings = Settings()  # type: ignore[call-arg]

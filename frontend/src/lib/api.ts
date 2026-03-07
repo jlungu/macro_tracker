@@ -1,9 +1,29 @@
 import axios from "axios";
+import { supabase } from "@/lib/supabase";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
   headers: { "Content-Type": "application/json" },
 });
+
+api.interceptors.request.use(async (config) => {
+  const { data } = await supabase.auth.getSession();
+  if (data.session?.access_token) {
+    config.headers.Authorization = `Bearer ${data.session.access_token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface Macros {
   calories: number;
@@ -23,16 +43,23 @@ export interface Meal {
   id: string;
   created_at: string;
   description: string;
+  emoji: string;
   macros: Macros;
   image_url: string | null;
   raw_input: string;
   notes: string | null;
 }
 
+export interface HistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface LogMealPayload {
   message: string;
   image_base64?: string;
   image_mime_type?: string;
+  history?: HistoryMessage[];
 }
 
 export interface LogMealResponse {
@@ -55,7 +82,9 @@ export async function logMeal(payload: LogMealPayload): Promise<LogMealResponse>
 
 // Fetch meals for a given date (ISO string, e.g. "2024-01-15")
 export async function fetchDailySummary(date: string): Promise<DailySummary> {
-  const { data } = await api.get<DailySummary>(`/meals/summary/${date}`);
+  const { data } = await api.get<DailySummary>(`/meals/summary/${date}`, {
+    params: { tz_offset: new Date().getTimezoneOffset() },
+  });
   return data;
 }
 

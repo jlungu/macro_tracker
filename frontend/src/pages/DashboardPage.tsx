@@ -6,7 +6,7 @@ import { toast } from "@/hooks/useToast";
 import { useTargets } from "@/hooks/useTargets";
 
 export default function DashboardPage() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local timezone
   const { data, isLoading } = useDailySummary(today);
   const { data: targets } = useTargets();
   const { mutate: deleteMeal } = useDeleteMeal();

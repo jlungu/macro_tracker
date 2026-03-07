@@ -1,20 +1,19 @@
 import { useState, useRef } from "react";
 import { Camera, Send, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLogMeal } from "@/hooks/useMeals";
-import { toast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
+import type { LogMealPayload } from "@/lib/api";
 
 interface MealLoggerProps {
-  onSuccess?: (claudeMessage: string) => void;
+  onSubmit: (payload: LogMealPayload, imagePreview?: string) => void;
+  isPending: boolean;
 }
 
-export default function MealLogger({ onSuccess }: MealLoggerProps) {
+export default function MealLogger({ onSubmit, isPending }: MealLoggerProps) {
   const [message, setMessage] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageMime, setImageMime] = useState<string>("image/jpeg");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { mutate, isPending } = useLogMeal();
 
   function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -46,40 +45,22 @@ export default function MealLogger({ onSuccess }: MealLoggerProps) {
     if (!message.trim() && !imagePreview) return;
 
     const base64 = imagePreview ? imagePreview.split(",")[1] : undefined;
-
-    mutate(
+    onSubmit(
       {
         message: message.trim(),
         image_base64: base64,
         image_mime_type: base64 ? imageMime : undefined,
       },
-      {
-        onSuccess: (data) => {
-          setMessage("");
-          clearImage();
-          if (data.meal) {
-            toast({ title: "Meal logged!", description: data.claude_message });
-          }
-          if (data.new_targets) {
-            toast({ title: "Targets updated!" });
-          }
-          onSuccess?.(data.claude_message);
-        },
-        onError: () => {
-          toast({
-            title: "Failed to log meal",
-            description: "Please try again.",
-            variant: "destructive",
-          });
-        },
-      }
+      imagePreview ?? undefined
     );
+    setMessage("");
+    clearImage();
   }
 
   const canSubmit = (message.trim() || imagePreview) && !isPending;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {imagePreview && (
         <div className="relative rounded-lg overflow-hidden">
           <img src={imagePreview} alt="Meal preview" className="w-full max-h-48 object-cover" />
@@ -117,7 +98,7 @@ export default function MealLogger({ onSuccess }: MealLoggerProps) {
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Describe your meal or ask a question…"
+          placeholder="Message…"
           rows={1}
           className={cn(
             "flex-1 bg-transparent resize-none text-base leading-5 outline-none placeholder:text-muted-foreground",
@@ -145,10 +126,6 @@ export default function MealLogger({ onSuccess }: MealLoggerProps) {
           )}
         </Button>
       </div>
-
-      <p className="text-xs text-muted-foreground text-center">
-        Describe a meal, take a photo, or ask about macros
-      </p>
     </form>
   );
 }

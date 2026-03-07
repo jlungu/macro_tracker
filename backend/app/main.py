@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import meals, targets
+from app.routes import foods, meals, targets
 
 app = FastAPI(title="Macro Tracker API", version="0.1.0")
 
@@ -16,6 +16,7 @@ app.add_middleware(
 
 app.include_router(meals.router)
 app.include_router(targets.router)
+app.include_router(foods.router)
 
 
 @app.get("/health")
