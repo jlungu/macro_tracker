@@ -11,8 +11,8 @@ import SettingsPage from "@/pages/SettingsPage";
 
 function AppLayout() {
   return (
-    <div className="flex flex-col h-full max-w-lg mx-auto relative">
-      <main className="flex-1 overflow-y-auto pb-20">
+    <div className="flex flex-col h-full max-w-lg mx-auto">
+      <main className="flex-1 overflow-y-auto pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <Outlet />
       </main>
       <BottomNav />

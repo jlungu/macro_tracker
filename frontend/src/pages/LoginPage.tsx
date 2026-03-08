@@ -1,22 +1,44 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const normalizedEmail = email.trim().toLowerCase();
   const [isSent, setIsSent] = useState(false);
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate("/dashboard", { replace: true });
+    });
+  }, []);
+
+  function startCooldown() {
+    setResendCooldown(60);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((n) => {
+        if (n <= 1) { clearInterval(cooldownRef.current!); return 0; }
+        return n - 1;
+      });
+    }, 1000);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (resendCooldown > 0) return;
     setIsLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail });
 
     setIsLoading(false);
 
@@ -24,6 +46,7 @@ export default function LoginPage() {
       setError(error.message);
     } else {
       setIsSent(true);
+      startCooldown();
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
     }
   }
@@ -35,10 +58,19 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
-
+    let { error } = await supabase.auth.verifyOtp({ email: normalizedEmail, token, type: "email" });
+    if (error) {
+      // Fallback for new users whose token type is "signup"
+      const res2 = await supabase.auth.verifyOtp({ email: normalizedEmail, token, type: "signup" });
+      if (!res2.error) error = null;
+      else error = res2.error;
+    }
     setIsLoading(false);
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
   }
 
   function handleCodeChange(index: number, value: string) {
@@ -47,12 +79,6 @@ export default function LoginPage() {
     next[index] = digit;
     setCode(next);
     if (digit && index < 5) inputRefs.current[index + 1]?.focus();
-    if (next.every(Boolean)) {
-      // auto-submit when all 6 digits entered
-      supabase.auth.verifyOtp({ email, token: next.join(""), type: "email" }).then(({ error }) => {
-        if (error) setError(error.message);
-      });
-    }
   }
 
   function handleCodeKeyDown(index: number, e: React.KeyboardEvent) {
@@ -65,9 +91,24 @@ export default function LoginPage() {
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (pasted.length === 6) {
       setCode(pasted.split(""));
-      supabase.auth.verifyOtp({ email, token: pasted, type: "email" }).then(({ error }) => {
+      supabase.auth.verifyOtp({ email: normalizedEmail, token: pasted, type: "email" }).then(({ error }) => {
         if (error) setError(error.message);
       });
+    }
+  }
+
+  async function handleResend() {
+    if (resendCooldown > 0) return;
+    setIsLoading(true);
+    setError(null);
+    setCode(["", "", "", "", "", ""]);
+    const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail });
+    setIsLoading(false);
+    if (error) {
+      setError(error.message);
+    } else {
+      startCooldown();
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
     }
   }
 
@@ -104,6 +145,14 @@ export default function LoginPage() {
               {error && <p className="text-sm text-destructive text-center">{error}</p>}
               <Button type="submit" disabled={isLoading || code.some((d) => !d)}>
                 {isLoading ? "Verifying…" : "Sign in"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={resendCooldown > 0 || isLoading}
+                onClick={handleResend}
+              >
+                {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend code"}
               </Button>
               <Button variant="ghost" onClick={() => { setIsSent(false); setCode(["", "", "", "", "", ""]); setError(null); }}>
                 Use a different email
