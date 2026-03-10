@@ -42,7 +42,7 @@ export function useLogMeal() {
 export function useUpdateMeal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { description?: string; macros?: Macros } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { description?: string; macros?: Macros; meal_type?: string } }) =>
       updateMeal(id, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["summary"] });

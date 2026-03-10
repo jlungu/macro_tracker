@@ -22,6 +22,7 @@ class Meal(BaseModel):
     description: str
     emoji: str = "🍽️"
     macros: Macros
+    meal_type: str = "snack"
     image_url: str | None = None
     raw_input: str
     notes: str | None = None
@@ -58,6 +59,7 @@ class LogMealResponse(BaseModel):
 class PatchMealRequest(BaseModel):
     description: str | None = None
     macros: Macros | None = None
+    meal_type: str | None = None
 
 
 class DailySummary(BaseModel):

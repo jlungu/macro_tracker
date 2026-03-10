@@ -5,6 +5,7 @@ interface MacroBarProps {
   macros: Macros;
   goal?: Macros;
   className?: string;
+  compact?: boolean;
 }
 
 function MacroStat({
@@ -13,14 +14,29 @@ function MacroStat({
   goal,
   unit,
   color,
+  compact,
 }: {
   label: string;
   value: number;
   goal?: number;
   unit: string;
   color: string;
+  compact?: boolean;
 }) {
   const pct = goal ? Math.min((value / goal) * 100, 100) : null;
+
+  if (compact) {
+    return (
+      <div className="flex items-baseline gap-1 shrink-0">
+        {label && <span className="text-xs text-muted-foreground">{label}</span>}
+        <span className="text-sm font-semibold">
+          {Math.round(value)}
+          <span className="text-xs font-normal text-muted-foreground ml-0.5">{unit}</span>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1 flex-1">
       <div className="flex justify-between items-baseline">
@@ -42,36 +58,40 @@ function MacroStat({
   );
 }
 
-export default function MacroBar({ macros, goal, className }: MacroBarProps) {
+export default function MacroBar({ macros, goal, className, compact }: MacroBarProps) {
   return (
-    <div className={cn("flex gap-4", className)}>
+    <div className={cn("flex", compact ? "gap-3" : "gap-4", className)}>
       <MacroStat
-        label="Calories"
+        label={compact ? "" : "Calories"}
         value={macros.calories}
         goal={goal?.calories}
         unit="kcal"
         color="bg-yellow-400"
+        compact={compact}
       />
       <MacroStat
-        label="Protein"
+        label={compact ? "P" : "Protein"}
         value={macros.protein_g}
         goal={goal?.protein_g}
         unit="g"
         color="bg-blue-400"
+        compact={compact}
       />
       <MacroStat
-        label="Carbs"
+        label={compact ? "C" : "Carbs"}
         value={macros.carbs_g}
         goal={goal?.carbs_g}
         unit="g"
         color="bg-green-400"
+        compact={compact}
       />
       <MacroStat
-        label="Fat"
+        label={compact ? "F" : "Fat"}
         value={macros.fat_g}
         goal={goal?.fat_g}
         unit="g"
         color="bg-orange-400"
+        compact={compact}
       />
     </div>
   );

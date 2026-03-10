@@ -3,7 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import MealLogger from "@/components/meals/MealLogger";
 import { useLogMeal } from "@/hooks/useMeals";
 import { toast } from "@/hooks/useToast";
+import { useAuth } from "@/context/AuthContext";
 import type { LogMealPayload, Meal, HistoryMessage } from "@/lib/api";
+
+// Generated fresh on every page load/refresh — clears chat on reload
+const PAGE_SESSION_ID = Math.random().toString(36).slice(2);
+const MAX_STORED_MESSAGES = 50;
 
 interface UserMsg {
   role: "user";
@@ -20,8 +25,27 @@ type ChatMsg = UserMsg | BotMsg;
 export default function LogPage() {
   const [searchParams] = useSearchParams();
   const logDate = searchParams.get("date") ?? undefined;
+  const { user } = useAuth();
+  const sessionKey = `chat_${user?.id ?? "anon"}_${logDate ?? "today"}`;
 
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [messages, setMessages] = useState<ChatMsg[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(sessionKey);
+      if (!saved) return [];
+      const { sid, msgs } = JSON.parse(saved);
+      // Different sid means page was refreshed — start fresh
+      return sid === PAGE_SESSION_ID ? msgs : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const msgs = messages.slice(-MAX_STORED_MESSAGES);
+      sessionStorage.setItem(sessionKey, JSON.stringify({ sid: PAGE_SESSION_ID, msgs }));
+    } catch {}
+  }, [messages, sessionKey]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { mutate, isPending } = useLogMeal();
 
@@ -72,7 +96,7 @@ export default function LogPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 80px)" }}>
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 80px - env(safe-area-inset-bottom, 0px))" }}>
       {displayDate && (
         <div className="px-4 py-2 bg-muted/50 border-b border-border/40 text-center">
           <p className="text-xs text-muted-foreground">
@@ -141,7 +165,7 @@ export default function LogPage() {
       </div>
 
       {/* Input — always at bottom */}
-      <div className="border-t border-border/40 bg-background px-4 pb-4 pt-2">
+      <div className="border-t border-border/40 bg-background px-4 pb-6 pt-2">
         <MealLogger onSubmit={handleSubmit} isPending={isPending} />
       </div>
     </div>

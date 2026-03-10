@@ -101,7 +101,7 @@ async def log_meal(
         )
         matched_foods = food_rows.data or []
 
-    macros, description, emoji, claude_message, is_meal, new_targets, foods_data = await analyze_meal(
+    macros, description, emoji, claude_message, is_meal, new_targets, foods_data, meal_type = await analyze_meal(
         user_message=body.message,
         history=[h.model_dump() for h in body.history],
         image_base64=body.image_base64,
@@ -110,6 +110,7 @@ async def log_meal(
         targets=targets,
         matched_foods=matched_foods or None,
         weekly_summary=weekly_summary or None,
+        local_hour=now_local.hour if not body.log_date else None,
     )
 
     if new_targets:
@@ -130,6 +131,7 @@ async def log_meal(
         "description": description,
         "emoji": emoji,
         "macros": macros.model_dump(),
+        "meal_type": meal_type,
         "image_url": image_url,
         "raw_input": body.message,
         "notes": claude_message,
@@ -258,6 +260,8 @@ async def patch_meal(
         updates["description"] = body.description
     if body.macros is not None:
         updates["macros"] = body.macros.model_dump()
+    if body.meal_type is not None:
+        updates["meal_type"] = body.meal_type
     if not updates:
         raise HTTPException(status_code=422, detail="Nothing to update")
     row = (

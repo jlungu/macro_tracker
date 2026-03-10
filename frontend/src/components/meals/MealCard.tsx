@@ -11,6 +11,7 @@ import {
 import MacroBar from "./MacroBar";
 import { useUpdateMeal } from "@/hooks/useMeals";
 import { toast } from "@/hooks/useToast";
+import { cn } from "@/lib/utils";
 import type { Meal } from "@/lib/api";
 
 interface MealCardProps {
@@ -24,7 +25,16 @@ interface EditState {
   protein_g: string;
   carbs_g: string;
   fat_g: string;
+  meal_type: string;
 }
+
+const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+};
 
 function MacroInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -50,6 +60,7 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
     protein_g: String(Math.round(meal.macros.protein_g)),
     carbs_g: String(Math.round(meal.macros.carbs_g)),
     fat_g: String(Math.round(meal.macros.fat_g)),
+    meal_type: meal.meal_type ?? "snack",
   });
 
   const { mutate: updateMeal, isPending: isSaving } = useUpdateMeal();
@@ -66,6 +77,7 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
       protein_g: String(Math.round(meal.macros.protein_g)),
       carbs_g: String(Math.round(meal.macros.carbs_g)),
       fat_g: String(Math.round(meal.macros.fat_g)),
+      meal_type: meal.meal_type ?? "snack",
     });
     setEditing(true);
   }
@@ -82,6 +94,7 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
             carbs_g: Number(edit.carbs_g) || 0,
             fat_g: Number(edit.fat_g) || 0,
           },
+          meal_type: edit.meal_type,
         },
       },
       {
@@ -110,7 +123,7 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
               <p className="font-medium text-sm leading-snug truncate">{meal.description}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{time}</p>
               <div className="mt-2">
-                <MacroBar macros={meal.macros} />
+                <MacroBar macros={meal.macros} compact />
               </div>
             </div>
             {onDelete && (
@@ -168,15 +181,39 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
               )}
             </div>
 
-            <p className="text-xs text-muted-foreground mt-1 mb-3">{time}</p>
+            <div className="flex items-center gap-2 mt-1 mb-3">
+              <p className="text-xs text-muted-foreground">{time}</p>
+              <span className="text-xs font-medium bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">
+                {MEAL_TYPE_LABELS[meal.meal_type] ?? "Snack"}
+              </span>
+            </div>
 
             {editing ? (
-              <div className="grid grid-cols-4 gap-2 text-center mb-4">
-                <MacroInput label="Cal" value={edit.calories} onChange={(v) => setEdit((s) => ({ ...s, calories: v }))} />
-                <MacroInput label="Protein" value={edit.protein_g} onChange={(v) => setEdit((s) => ({ ...s, protein_g: v }))} />
-                <MacroInput label="Carbs" value={edit.carbs_g} onChange={(v) => setEdit((s) => ({ ...s, carbs_g: v }))} />
-                <MacroInput label="Fat" value={edit.fat_g} onChange={(v) => setEdit((s) => ({ ...s, fat_g: v }))} />
-              </div>
+              <>
+                <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                  <MacroInput label="Cal" value={edit.calories} onChange={(v) => setEdit((s) => ({ ...s, calories: v }))} />
+                  <MacroInput label="Protein" value={edit.protein_g} onChange={(v) => setEdit((s) => ({ ...s, protein_g: v }))} />
+                  <MacroInput label="Carbs" value={edit.carbs_g} onChange={(v) => setEdit((s) => ({ ...s, carbs_g: v }))} />
+                  <MacroInput label="Fat" value={edit.fat_g} onChange={(v) => setEdit((s) => ({ ...s, fat_g: v }))} />
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 mb-4">
+                  {MEAL_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setEdit((s) => ({ ...s, meal_type: type }))}
+                      className={cn(
+                        "text-xs py-1.5 rounded-lg font-medium transition-colors",
+                        edit.meal_type === type
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground"
+                      )}
+                    >
+                      {MEAL_TYPE_LABELS[type]}
+                    </button>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="grid grid-cols-4 gap-2 text-center mb-4">
                 {[

@@ -82,16 +82,38 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Meals
         </h2>
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : data?.meals.length ? (
-          data.meals.map((meal) => (
-            <MealCard key={meal.id} meal={meal} onDelete={handleDelete} />
-          ))
+          (() => {
+            const order = ["breakfast", "lunch", "dinner", "snack"];
+            const labels: Record<string, string> = {
+              breakfast: "Breakfast",
+              lunch: "Lunch",
+              dinner: "Dinner",
+              snack: "Snacks",
+            };
+            return order
+              .map((type) => ({
+                type,
+                meals: data.meals.filter((m) => m.meal_type === type),
+              }))
+              .filter(({ meals }) => meals.length > 0)
+              .map(({ type, meals }) => (
+                <div key={type} className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {labels[type]}
+                  </h3>
+                  {meals.map((meal) => (
+                    <MealCard key={meal.id} meal={meal} onDelete={handleDelete} />
+                  ))}
+                </div>
+              ));
+          })()
         ) : (
           <p className="text-sm text-muted-foreground">
             No meals yet — tap Log to add one.

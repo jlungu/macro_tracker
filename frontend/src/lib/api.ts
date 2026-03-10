@@ -45,6 +45,7 @@ export interface Meal {
   description: string;
   emoji: string;
   macros: Macros;
+  meal_type: string;
   image_url: string | null;
   raw_input: string;
   notes: string | null;
@@ -119,7 +120,7 @@ export async function deleteMeal(id: string): Promise<void> {
 // Patch a meal's description and/or macros
 export async function updateMeal(
   id: string,
-  patch: { description?: string; macros?: Macros }
+  patch: { description?: string; macros?: Macros; meal_type?: string }
 ): Promise<Meal> {
   const { data } = await api.patch<Meal>(`/meals/${id}`, patch);
   return data;

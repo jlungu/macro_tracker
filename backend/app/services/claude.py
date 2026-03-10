@@ -21,6 +21,7 @@ When the user describes a meal or sends a photo of food, extract macro informati
 Always respond with a JSON object in this exact format:
 {
   "is_meal": true,
+  "meal_type": "lunch",
   "emoji": "🍗",
   "description": "Brief, clear meal name (e.g. 'Chicken rice bowl with broccoli')",
   "calories": 550,
@@ -36,8 +37,10 @@ Always respond with a JSON object in this exact format:
 }
 
 Guidelines:
+- ALWAYS respond with valid JSON in the exact format above — no exceptions, no plain text, no markdown outside the JSON block. This applies to every message including greetings, unclear inputs, or off-topic questions.
 - Set "is_meal" to true only if the user is clearly logging food or a drink with nutritional value
-- Set "is_meal" to false for questions, check-ins, or anything where no food is being logged — in that case set calories/protein/carbs/fat to 0
+- Set "is_meal" to false for questions, check-ins, greetings, unclear inputs, or anything where no food is being logged — in that case set calories/protein/carbs/fat to 0
+- Set "meal_type" to one of: "breakfast", "lunch", "dinner", "snack". Infer from the local time provided in context (breakfast: 5am–11am, lunch: 11am–3pm, dinner: 5pm–9pm, snack: all other times). If the user explicitly names the meal (e.g. "I had X for dinner"), always use what they said. Set to "snack" for non-meal responses.
 - Estimate macros as accurately as possible based on typical serving sizes
 - If an image is provided, use it to inform your estimates
 - emoji should be a single emoji that best represents the meal. Use 🍽️ for non-meal responses
@@ -49,7 +52,7 @@ Serving size and quantity rules (IMPORTANT):
 - Pay close attention to how much the user ate: "the whole box", "the entire bag", "half a serving", "2 cups" all affect the total
 - If the user consumed multiple servings (e.g. a box with 2.5 servings per container and they ate the whole box), multiply the per-serving macros by the number of servings
 - Nutrition labels show per-serving values — always check "servings per container" and multiply if the user ate more than one serving
-- When uncertain about quantity, ask in your message and make a reasonable assumption
+- If you genuinely cannot estimate a reasonable quantity (e.g. "I had some chips", "I ate pasta"), set is_meal to false and ask a natural follow-up question in message like "How much did you have? A full bowl, or more like a side portion?" — do NOT log a guess. Once the user tells you the amount, log it in the next turn.
 
 Food database rules:
 - Always populate "foods" with each distinct food item in a logged meal (packaged products, whole foods, beverages, etc)
@@ -71,7 +74,8 @@ async def analyze_meal(
     targets: Targets | None = None,
     matched_foods: list[dict] | None = None,
     weekly_summary: dict | None = None,
-) -> tuple[Macros, str, str, str, bool, Targets | None, list[dict]]:
+    local_hour: int | None = None,
+) -> tuple[Macros, str, str, str, bool, Targets | None, list[dict], str]:
     system = SYSTEM_PROMPT
 
     if matched_foods:
@@ -97,6 +101,9 @@ async def analyze_meal(
             f"{targets.carbs_g:.0f}g carbs, "
             f"{targets.fat_g:.0f}g fat."
         )
+
+    if local_hour is not None:
+        system += f"\n\nCurrent local time: {local_hour:02d}:00."
 
     if weekly_summary:
         lines = []
@@ -156,7 +163,13 @@ async def analyze_meal(
     if raw.strip().startswith("```"):
         raw = raw.strip().lstrip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
 
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Claude returned plain text instead of JSON — treat as a non-meal reply
+        data = {"is_meal": False, "message": raw.strip(), "emoji": "🍽️",
+                "description": "", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0,
+                "meal_type": "snack", "new_targets": None, "foods": []}
 
     macros = Macros(
         calories=data.get("calories", 0),
@@ -179,5 +192,6 @@ async def analyze_meal(
         )
 
     foods_data: list[dict] = data.get("foods", [])
+    meal_type: str = data.get("meal_type", "snack")
 
-    return macros, description, emoji, message, is_meal, new_targets, foods_data
+    return macros, description, emoji, message, is_meal, new_targets, foods_data, meal_type
