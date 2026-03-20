@@ -62,10 +62,11 @@ export interface LogMealPayload {
   image_mime_type?: string;
   history?: HistoryMessage[];
   log_date?: string; // YYYY-MM-DD, set when backdating a meal
+  previous_meal_ids?: string[];
 }
 
 export interface LogMealResponse {
-  meal: Meal | null;
+  meals: Meal[];
   claude_message: string;
   new_targets: Targets | null;
 }
@@ -82,6 +83,8 @@ export interface FoodItem {
   serving_size: string;
   macros: Macros;
   use_count: number;
+  is_food_item: boolean;
+  emoji: string;
 }
 
 // Log a meal via text and/or image
@@ -90,6 +93,12 @@ export async function logMeal(payload: LogMealPayload): Promise<LogMealResponse>
     ...payload,
     tz_offset: new Date().getTimezoneOffset(),
   });
+  return data;
+}
+
+// Re-log a meal from history with known macros (no Claude call)
+export async function quickLogMeal(meal: Pick<Meal, "description" | "emoji" | "macros" | "meal_type" | "image_url">): Promise<Meal> {
+  const { data } = await api.post<Meal>("/meals/quick", meal);
   return data;
 }
 

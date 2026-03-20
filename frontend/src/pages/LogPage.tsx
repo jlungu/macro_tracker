@@ -18,7 +18,7 @@ interface UserMsg {
 interface BotMsg {
   role: "assistant";
   content: string;
-  meal: Meal | null;
+  meals: Meal[];
 }
 type ChatMsg = UserMsg | BotMsg;
 
@@ -47,6 +47,7 @@ export default function LogPage() {
     } catch {}
   }, [messages, sessionKey]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastMealIdsRef = useRef<string[]>([]);
   const { mutate, isPending } = useLogMeal();
 
   useEffect(() => {
@@ -72,13 +73,15 @@ export default function LogPage() {
       { role: "user", content: payload.message, image: imagePreview },
     ]);
 
-    mutate({ ...payload, history, log_date: logDate }, {
+    mutate({ ...payload, history, log_date: logDate, previous_meal_ids: lastMealIdsRef.current }, {
       onSuccess: (data) => {
+        lastMealIdsRef.current = data.meals.map((m) => m.id);
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: data.claude_message, meal: data.meal },
+          { role: "assistant", content: data.claude_message, meals: data.meals },
         ]);
-        if (data.meal) toast({ title: "Meal logged!" });
+        if (data.meals.length === 1) toast({ title: `${data.meals[0].emoji} Logged!` });
+        else if (data.meals.length > 1) toast({ title: `${data.meals.length} items logged!` });
         if (data.new_targets) toast({ title: "Targets updated!" });
       },
       onError: () => {
@@ -87,7 +90,7 @@ export default function LogPage() {
           {
             role: "assistant",
             content: "Something went wrong. Please try again.",
-            meal: null,
+            meals: [],
           },
         ]);
         toast({ title: "Error", variant: "destructive" });
@@ -135,12 +138,19 @@ export default function LogPage() {
               <div key={i} className="flex flex-col items-start max-w-[85%]">
                 <div className="bg-secondary rounded-2xl rounded-tl-sm px-4 py-2.5">
                   <p className="text-sm leading-relaxed">{msg.content}</p>
-                  {msg.meal && (
-                    <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground flex gap-2 flex-wrap">
-                      <span>{Math.round(msg.meal.macros.calories)} cal</span>
-                      <span>{Math.round(msg.meal.macros.protein_g)}g protein</span>
-                      <span>{Math.round(msg.meal.macros.carbs_g)}g carbs</span>
-                      <span>{Math.round(msg.meal.macros.fat_g)}g fat</span>
+                  {msg.meals.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1.5">
+                      {msg.meals.map((meal) => (
+                        <div key={meal.id} className="text-xs text-muted-foreground flex gap-2 flex-wrap items-center">
+                          {msg.meals.length > 1 && (
+                            <span className="font-medium text-foreground">{meal.emoji} {meal.description}</span>
+                          )}
+                          <span>{Math.round(meal.macros.calories)} cal</span>
+                          <span>{Math.round(meal.macros.protein_g)}g protein</span>
+                          <span>{Math.round(meal.macros.carbs_g)}g carbs</span>
+                          <span>{Math.round(meal.macros.fat_g)}g fat</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

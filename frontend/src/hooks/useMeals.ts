@@ -4,9 +4,11 @@ import {
   fetchDailySummary,
   fetchMealHistory,
   logMeal,
+  quickLogMeal,
   updateMeal,
   type LogMealPayload,
   type Macros,
+  type Meal,
 } from "@/lib/api";
 
 export function useDailySummary(date: string) {
@@ -29,9 +31,11 @@ export function useLogMeal() {
     mutationFn: (payload: LogMealPayload) => logMeal(payload),
     onSuccess: (data) => {
       const today = new Date().toLocaleDateString("en-CA");
-      queryClient.invalidateQueries({ queryKey: ["summary", today] });
-      queryClient.invalidateQueries({ queryKey: ["meals"] });
-      queryClient.invalidateQueries({ queryKey: ["foods"] });
+      if (data.meals.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["summary", today] });
+        queryClient.invalidateQueries({ queryKey: ["meals"] });
+        queryClient.invalidateQueries({ queryKey: ["foods"] });
+      }
       if (data.new_targets) {
         queryClient.invalidateQueries({ queryKey: ["targets"] });
       }
@@ -47,6 +51,20 @@ export function useUpdateMeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["summary"] });
       queryClient.invalidateQueries({ queryKey: ["meals"] });
+    },
+  });
+}
+
+export function useQuickLogMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (meal: Pick<Meal, "description" | "emoji" | "macros" | "meal_type" | "image_url">) =>
+      quickLogMeal(meal),
+    onSuccess: () => {
+      const today = new Date().toLocaleDateString("en-CA");
+      queryClient.invalidateQueries({ queryKey: ["summary", today] });
+      queryClient.invalidateQueries({ queryKey: ["meals"] });
+      queryClient.invalidateQueries({ queryKey: ["foods"] });
     },
   });
 }

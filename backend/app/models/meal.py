@@ -26,14 +26,15 @@ class Meal(BaseModel):
     image_url: str | None = None
     raw_input: str
     notes: str | None = None
-
-
+    model_config = {"extra": "ignore"}
 class FoodItem(BaseModel):
     id: UUID4 | None = None
     name: str
     serving_size: str
     macros: Macros
     use_count: int = 1
+    is_food_item: bool = True
+    emoji: str = "🍽️"
 
 
 class HistoryMessage(BaseModel):
@@ -48,12 +49,21 @@ class LogMealRequest(BaseModel):
     history: list[HistoryMessage] = []
     tz_offset: int = 0  # JS getTimezoneOffset(): positive = behind UTC (e.g. UTC-5 → 300)
     log_date: str | None = None  # YYYY-MM-DD override for backdating meals
+    previous_meal_ids: list[str] = []  # IDs to delete if Claude signals a correction
 
 
 class LogMealResponse(BaseModel):
-    meal: Meal | None = None
+    meals: list[Meal] = []
     claude_message: str
     new_targets: Targets | None = None
+
+
+class QuickLogMealRequest(BaseModel):
+    description: str
+    emoji: str = "🍽️"
+    macros: Macros
+    meal_type: str = "snack"
+    image_url: str | None = None
 
 
 class PatchMealRequest(BaseModel):

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2, Pencil, Check, X } from "lucide-react";
+import { Trash2, Pencil, Check, X, PlusCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import type { Meal } from "@/lib/api";
 interface MealCardProps {
   meal: Meal;
   onDelete?: (id: string) => void;
+  onAdd?: (meal: Meal) => void;
 }
 
 interface EditState {
@@ -28,12 +29,13 @@ interface EditState {
   meal_type: string;
 }
 
-const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack", "food"] as const;
 const MEAL_TYPE_LABELS: Record<string, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",
   dinner: "Dinner",
   snack: "Snack",
+  food: "Food item",
 };
 
 function MacroInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -51,7 +53,7 @@ function MacroInput({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-export default function MealCard({ meal, onDelete }: MealCardProps) {
+export default function MealCard({ meal, onDelete, onAdd }: MealCardProps) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<EditState>({
@@ -108,8 +110,42 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
     );
   }
 
+  const isFoodItem = meal.meal_type === "food";
+
   return (
     <>
+      {isFoodItem ? (
+        <div
+          className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-card px-4 py-3 cursor-pointer active:opacity-80 transition-opacity"
+          onClick={() => setOpen(true)}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-xl shrink-0">{meal.emoji || "🍽️"}</span>
+            <div className="min-w-0">
+              <p className="font-medium text-sm leading-tight truncate">{meal.description}</p>
+              <div className="flex gap-2 flex-wrap mt-0.5 text-xs text-muted-foreground">
+                <span><span className="font-medium text-foreground">{Math.round(meal.macros.calories)}</span> cal</span>
+                <span><span className="font-medium text-foreground">{Math.round(meal.macros.protein_g)}</span>g P</span>
+                <span><span className="font-medium text-foreground">{Math.round(meal.macros.carbs_g)}</span>g C</span>
+                <span><span className="font-medium text-foreground">{Math.round(meal.macros.fat_g)}</span>g F</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] text-muted-foreground">{time}</span>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); onDelete(meal.id); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : (
       <Card
         className="overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
         onClick={() => setOpen(true)}
@@ -142,6 +178,7 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(false); }}>
         <DialogContent className="max-w-sm p-0 overflow-hidden">
@@ -231,7 +268,17 @@ export default function MealCard({ meal, onDelete }: MealCardProps) {
             )}
 
             {meal.notes && !editing && (
-              <p className="text-xs text-muted-foreground leading-relaxed">{meal.notes}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-3">{meal.notes}</p>
+            )}
+
+            {onAdd && !editing && (
+              <Button
+                className="w-full"
+                onClick={() => { onAdd(meal); setOpen(false); }}
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add to today
+              </Button>
             )}
           </div>
         </DialogContent>

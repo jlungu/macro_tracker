@@ -10,6 +10,7 @@ from app.models.meal import (
     Macros,
     Meal,
     PatchMealRequest,
+    QuickLogMealRequest,
     Targets,
 )
 from app.services.claude import analyze_meal
@@ -101,7 +102,7 @@ async def log_meal(
         )
         matched_foods = food_rows.data or []
 
-    macros, description, emoji, claude_message, is_meal, new_targets, foods_data, meal_type = await analyze_meal(
+    items, claude_message, new_targets, correction = await analyze_meal(
         user_message=body.message,
         history=[h.model_dump() for h in body.history],
         image_base64=body.image_base64,
@@ -116,75 +117,126 @@ async def log_meal(
     if new_targets:
         db.table("targets").upsert({"user_id": current_user.id, **new_targets.model_dump()}).execute()
 
-    if not is_meal:
-        return LogMealResponse(meal=None, claude_message=claude_message, new_targets=new_targets)
+    # Delete previous meals if this is a correction
+    if correction and body.previous_meal_ids:
+        for mid in body.previous_meal_ids:
+            db.table("meals").delete().eq("id", mid).eq("user_id", current_user.id).execute()
 
+    meal_items = [item for item in items if item.get("is_meal")]
+    for item in meal_items:
+        item["_is_food_item"] = len(item.get("foods", [])) <= 1
+    if not meal_items:
+        return LogMealResponse(meals=[], claude_message=claude_message, new_targets=new_targets)
+
+    # Upload image once and share the URL across all items (if any)
     image_url: str | None = None
-    if body.image_base64:
+    if body.image_base64 and len(meal_items) == 1:
         image_url = await upload_meal_image(
             body.image_base64,
             mime_type=body.image_mime_type or "image/jpeg",
         )
 
-    meal_row: dict = {
-        "user_id": current_user.id,
-        "description": description,
-        "emoji": emoji,
-        "macros": macros.model_dump(),
-        "meal_type": meal_type,
-        "image_url": image_url,
-        "raw_input": body.message,
-        "notes": claude_message,
-    }
+    noon_utc = None
     if body.log_date:
-        # Store backdated meals at noon local time so they sort naturally
         noon_utc = (local_midnight + timedelta(hours=12) + offset).replace(tzinfo=timezone.utc)
-        meal_row["created_at"] = noon_utc.isoformat()
 
+    saved_meals: list[Meal] = []
+    for item in meal_items:
+        macros_dict = {
+            "calories": item.get("calories", 0),
+            "protein_g": item.get("protein_g", 0),
+            "carbs_g": item.get("carbs_g", 0),
+            "fat_g": item.get("fat_g", 0),
+        }
+        is_food_item: bool = item["_is_food_item"]
+        description: str = item.get("description", body.message[:120])
+
+        meal_row: dict = {
+            "user_id": current_user.id,
+            "description": description,
+            "emoji": item.get("emoji", "🍽️"),
+            "macros": macros_dict,
+            "meal_type": item.get("meal_type", "snack"),
+            "image_url": image_url,
+            "raw_input": body.message,
+            "notes": claude_message,
+        }
+        if noon_utc:
+            meal_row["created_at"] = noon_utc.isoformat()
+
+        row = db.table("meals").insert(meal_row).execute()
+        if not row.data:
+            raise HTTPException(status_code=500, detail="Failed to save meal")
+        saved_meals.append(Meal(**row.data[0]))
+
+        # --- Upsert into the foods library ---
+        item_emoji: str = item.get("emoji", "🍽️")
+
+        def upsert_food(name: str, serving_size: str, food_macros: dict, food_item_flag: bool, emoji: str = "🍽️") -> None:
+            name = name.strip()
+            serving_size = serving_size.strip()
+            if not name or not serving_size:
+                return
+            existing = (
+                db.table("foods")
+                .select("id,use_count")
+                .eq("user_id", current_user.id)
+                .ilike("name", name)
+                .maybe_single()
+                .execute()
+            )
+            if existing and existing.data:
+                db.table("foods").update(
+                    {"use_count": existing.data["use_count"] + 1, "macros": food_macros,
+                     "serving_size": serving_size, "is_food_item": food_item_flag, "emoji": emoji}
+                ).eq("id", existing.data["id"]).execute()
+            else:
+                db.table("foods").insert(
+                    {"user_id": current_user.id, "name": name, "serving_size": serving_size,
+                     "macros": food_macros, "is_food_item": food_item_flag, "emoji": emoji}
+                ).execute()
+
+        foods_list = item.get("foods", [])
+
+        if is_food_item:
+            # Single food: upsert ingredient(s) as food items; fall back to meal data if empty
+            if foods_list:
+                for food in foods_list:
+                    food_macros = {k: food[k] for k in ("calories", "protein_g", "carbs_g", "fat_g") if k in food}
+                    upsert_food(food.get("name", ""), food.get("serving_size", ""), food_macros, True, item_emoji)
+            else:
+                upsert_food(description, "1 serving", macros_dict, True, item_emoji)
+        else:
+            # Composed meal: upsert the whole meal as a reusable meal entry
+            upsert_food(description, "1 serving", macros_dict, False, item_emoji)
+            # Also upsert each ingredient as a food item
+            for food in foods_list:
+                food_macros = {k: food[k] for k in ("calories", "protein_g", "carbs_g", "fat_g") if k in food}
+                upsert_food(food.get("name", ""), food.get("serving_size", ""), food_macros, True)
+
+    return LogMealResponse(meals=saved_meals, claude_message=claude_message, new_targets=new_targets)
+
+
+@router.post("/quick", response_model=Meal)
+async def quick_log_meal(
+    body: QuickLogMealRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> Meal:
+    """Re-log a meal directly from the library without going through Claude."""
+    db = get_db()
+    meal_row = {
+        "user_id": current_user.id,
+        "description": body.description,
+        "emoji": body.emoji,
+        "macros": body.macros.model_dump(),
+        "meal_type": body.meal_type,
+        "image_url": body.image_url,
+        "raw_input": body.description,
+    }
     row = db.table("meals").insert(meal_row).execute()
-
     if not row.data:
         raise HTTPException(status_code=500, detail="Failed to save meal")
-
-    # Upsert foods returned by Claude into the user's food database
-    for food in foods_data:
-        name = food.get("name", "").strip()
-        serving_size = food.get("serving_size", "").strip()
-        if not name or not serving_size:
-            continue
-        macros_dict = {
-            k: food[k]
-            for k in ("calories", "protein_g", "carbs_g", "fat_g")
-            if k in food
-        }
-        existing = (
-            db.table("foods")
-            .select("id,use_count")
-            .eq("user_id", current_user.id)
-            .ilike("name", name)
-            .maybe_single()
-            .execute()
-        )
-        if existing and existing.data:
-            db.table("foods").update(
-                {
-                    "use_count": existing.data["use_count"] + 1,
-                    "macros": macros_dict,
-                    "serving_size": serving_size,
-                }
-            ).eq("id", existing.data["id"]).execute()
-        else:
-            db.table("foods").insert(
-                {
-                    "user_id": current_user.id,
-                    "name": name,
-                    "serving_size": serving_size,
-                    "macros": macros_dict,
-                }
-            ).execute()
-
-    meal = Meal(**row.data[0])
-    return LogMealResponse(meal=meal, claude_message=claude_message, new_targets=new_targets)
+    return Meal(**row.data[0])
 
 
 @router.get("/summary/{date_str}", response_model=DailySummary)

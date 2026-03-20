@@ -9,7 +9,7 @@ router = APIRouter(prefix="/foods", tags=["foods"])
 @router.get("", response_model=list[FoodItem])
 async def list_foods(
     offset: int = 0,
-    limit: int = 50,
+    limit: int = 200,
     current_user: AuthUser = Depends(get_current_user),
 ) -> list[FoodItem]:
     """Return the user's saved food library, sorted by most-used first."""
@@ -22,16 +22,21 @@ async def list_foods(
         .range(offset, offset + limit - 1)
         .execute()
     )
-    return [
-        FoodItem(
+    items = []
+    for r in rows.data:
+        macros_data = r.get("macros") or {}
+        if not macros_data.get("calories") and macros_data.get("calories") != 0:
+            continue  # skip rows with missing/empty macros
+        items.append(FoodItem(
             id=r["id"],
             name=r["name"],
             serving_size=r["serving_size"],
-            macros=Macros(**r["macros"]),
+            macros=Macros(**macros_data),
             use_count=r["use_count"],
-        )
-        for r in rows.data
-    ]
+            is_food_item=r.get("is_food_item", True),
+            emoji=r.get("emoji") or "🍽️",
+        ))
+    return items
 
 
 @router.delete("/{food_id}", status_code=204)
